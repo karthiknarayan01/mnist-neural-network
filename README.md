@@ -42,6 +42,7 @@ has never used NumPy before.
 | Weight initialization | Gaussian, scaled by 1/√(inputs) | Keeps each neuron's initial input in a sensible range, so training doesn't start out stuck on the sigmoid curve's flat tails. |
 | Optimizer | Mini-batch SGD, batch size 50 | Frequent, cheap gradient updates rather than one slow, exact update per epoch. |
 | Learning rate | Starts large (0.5), automatically halved after 5 epochs with no validation improvement, training stops once it decays below 0.001 | Fast progress early on, careful fine-tuning later, without needing to hand-tune a fixed schedule. |
+| Data augmentation | Each training image is rotated ±15°, in 10 evenly-spaced steps, adding 10 extra copies per image (50,000 → 550,000 training examples) | Teaches the network that a digit's identity doesn't change with small slants in handwriting, instead of letting it memorize incidental quirks of the original 50,000 images. See `src/augmentation.py`. |
 
 Every one of these choices is explained in plain language, inline, in
 the source files themselves:
@@ -54,46 +55,82 @@ the source files themselves:
   variable-learning-rate training loop.
 - [`src/mnist_loader.py`](src/mnist_loader.py) — turning the raw MNIST
   file into the shape the network trains on.
+- [`src/augmentation.py`](src/augmentation.py) — expanding the training
+  set with rotated copies of each image.
+
+**A note on sigmoid vs. softmax:** the output layer here is 10
+independent sigmoid neurons paired with cross-entropy cost, exactly as
+in the book — *not* a softmax layer. Each output neuron estimates "how
+much does this look like my digit?" on its own 0–1 scale; the ten
+values aren't forced to sum to 1 the way true softmax probabilities
+are. This keeps the math consistent throughout the project (the same
+`CrossEntropyCost.delta` simplification that avoids the "learning
+slowdown" problem relies on a sigmoid output layer), and is what the
+companion web app's confidence bars are built on, normalized by their
+sum to display as friendly percentages.
 
 ## The data
 
 [MNIST](http://yann.lecun.com/exdb/mnist/): 70,000 handwritten digit
 images, 28×28 pixels each, split into:
 
-- **50,000** training images
+- **50,000** training images — expanded to **550,000** via rotation-based
+  augmentation before training (see above); only the training set is
+  ever augmented
 - **10,000** validation images (used only to decide when to shrink the
-  learning rate — never learned from directly)
+  learning rate — never learned from directly, never augmented)
 - **10,000** test images (used only once, at the very end, for a final
-  unbiased accuracy score)
+  unbiased accuracy score — never augmented)
 
 ## Results
 
 <!-- BENCHMARK_START -->
 | Metric | Value |
 |---|---|
-| **Final test accuracy** | **98.02%** (9,802 / 10,000) |
-| Final validation accuracy | 97.88% |
-| Best validation accuracy (any epoch) | 97.95% |
-| Epochs run | 60 (hit the epoch cap — accuracy had largely plateaued) |
-| Learning rate schedule | 0.5 → 0.25 (epoch 30) → 0.125 (epoch 38) → 0.0625 (epoch 52) |
-| Total training time | ~7.7 minutes, on a laptop CPU, no GPU |
+| **Final test accuracy** | **98.47%** (9,847 / 10,000) |
+| Final validation accuracy | 98.36% |
+| Best validation accuracy (any epoch) | 98.40% |
+| Training examples | 550,000 (50,000 original + 500,000 rotated copies) |
+| Epochs run | 30 (hit the epoch cap — accuracy had largely plateaued) |
+| Learning rate schedule | 0.5 → 0.25 (epoch 19) → 0.125 (epoch 25) → 0.0625 (epoch 30) |
+| Total training time | ~38.8 minutes, on a laptop CPU, no GPU |
 
-Validation accuracy climbed quickly in the first ~5 epochs (86% → 97%),
-then kept inching upward as the learning rate automatically stepped
-down whenever progress stalled for 5 epochs in a row — each drop in eta
-is visible as a small jump in accuracy right afterward:
+### Effect of rotation-based data augmentation
+
+The network was first trained on the plain 50,000-image training set,
+then again after expanding it with rotated copies (see "Data
+augmentation" above). Augmentation measurably helped:
+
+| | Without augmentation | With augmentation (±15° rotations) |
+|---|---|---|
+| Training examples | 50,000 | 550,000 |
+| Epochs run | 60 | 30 |
+| Final test accuracy | 98.02% | **98.47%** (+0.45 points) |
+| Training time | ~7.7 min | ~38.8 min |
+
+This matches the general expectation for this kind of technique on a
+plain, fully-connected sigmoid network (no convolutional layers): it
+reliably helps — by making the network more robust to the natural
+variation in real handwriting rather than letting it overfit to the
+exact slant of the original 50,000 images — but the improvement is
+modest, not dramatic. Architectures without convolutional layers tend
+to plateau somewhere in the 98–98.5% range on MNIST regardless of how
+much more data you add; pushing meaningfully past that would need a
+different kind of network (e.g. a CNN), not just more training examples.
+
+Validation accuracy on the augmented run climbed past 97% within the
+first epoch (each epoch now sees 11x more examples) and kept inching
+upward as the learning rate automatically stepped down whenever
+progress stalled for 5 epochs in a row:
 
 ```
-Epoch  1  eta=0.5     val_acc=86.36%
-Epoch  5  eta=0.5     val_acc=96.63%
-Epoch 10  eta=0.5     val_acc=97.04%
-Epoch 29  eta=0.5     val_acc=97.35%   -> no improvement for 5 epochs, reducing eta to 0.25
-Epoch 30  eta=0.25    val_acc=97.80%
-Epoch 37  eta=0.25    val_acc=97.83%   -> no improvement for 5 epochs, reducing eta to 0.125
-Epoch 42  eta=0.125   val_acc=97.90%
-Epoch 51  eta=0.125   val_acc=97.90%   -> no improvement for 5 epochs, reducing eta to 0.0625
-Epoch 58  eta=0.0625  val_acc=97.95%
-Epoch 60  eta=0.0625  val_acc=97.88%
+Epoch  1  eta=0.5     val_acc=97.08%
+Epoch  9  eta=0.5     val_acc=98.15%
+Epoch 18  eta=0.5     val_acc=97.94%   -> no improvement for 5 epochs, reducing eta to 0.25
+Epoch 19  eta=0.25    val_acc=98.40%   (best epoch)
+Epoch 24  eta=0.25    val_acc=98.29%   -> no improvement for 5 epochs, reducing eta to 0.125
+Epoch 29  eta=0.125   val_acc=98.26%   -> no improvement for 5 epochs, reducing eta to 0.0625
+Epoch 30  eta=0.0625  val_acc=98.36%
 ```
 
 Full hyperparameters and the complete per-epoch log are in
@@ -116,7 +153,9 @@ python3 scripts/download_mnist.py
 python3 scripts/train.py
 ```
 
-Training prints live progress after every epoch, and finishes by saving:
+Training first expands the training set with rotated copies (~15
+seconds), then prints live progress after every epoch, and finishes by
+saving:
 
 - `model/trained_network.json` — the trained weights and biases (also
   used by the companion web app).
@@ -124,8 +163,10 @@ Training prints live progress after every epoch, and finishes by saving:
   and every epoch's accuracy, for reproducibility.
 
 On a normal laptop CPU (no GPU needed — the network and dataset are
-small enough that plain NumPy is plenty fast), training takes a few
-minutes.
+small enough that plain NumPy is plenty fast), training takes roughly
+35-40 minutes with data augmentation enabled (550,000 training
+examples), or well under 10 minutes with it turned off. Toggle it with
+the `AUGMENT_WITH_ROTATIONS` flag at the top of `scripts/train.py`.
 
 ### Using the trained network afterwards
 
@@ -146,7 +187,8 @@ mnist-neural-network/
 │   ├── activations.py      # sigmoid neuron
 │   ├── cost_functions.py   # cross-entropy cost
 │   ├── network.py          # the Network class: training + inference
-│   └── mnist_loader.py     # loads and reshapes the MNIST dataset
+│   ├── mnist_loader.py     # loads and reshapes the MNIST dataset
+│   └── augmentation.py     # expands training data with rotated copies
 ├── scripts/
 │   ├── download_mnist.py   # fetches the raw dataset
 │   └── train.py            # trains the network end-to-end
