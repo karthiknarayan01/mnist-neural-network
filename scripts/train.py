@@ -84,10 +84,11 @@ MIN_ETA = 0.001                           # stop once eta decays below this
 # This trades training time for a (usually small) accuracy and
 # robustness improvement, since the network sees more varied examples of
 # each digit instead of just the original 50,000. A CNN epoch is already
-# much more expensive than a dense-network epoch, so this defaults to
-# off for the CNN to keep a single training run's time reasonable --
-# flip it on if you have the time to spare.
-AUGMENT_WITH_ROTATIONS = ARCHITECTURE == "dense"
+# much more expensive than a dense-network epoch, and the augmented set
+# is 11x bigger, so CNN + augmentation together cost real time (several
+# hours) -- set explicitly below rather than derived, so that cost is a
+# deliberate choice each time, not a side effect of the architecture flag.
+AUGMENT_WITH_ROTATIONS = True
 ROTATION_MAX_ANGLE = 15.0                 # degrees, in each direction
 ROTATION_COPIES_PER_IMAGE = 10            # extra rotated copies per original image
 

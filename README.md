@@ -217,7 +217,7 @@ Full hyperparameters and the complete per-epoch log are in
 [`benchmarks/benchmark.json`](benchmarks/benchmark.json).
 <!-- BENCHMARK_END -->
 
-## Results — CNN
+## Results — CNN, no augmentation
 
 <!-- CNN_BENCHMARK_START -->
 | Metric | Value |
@@ -233,9 +233,9 @@ Full hyperparameters and the complete per-epoch log are in
 The CNN reached 97.67% validation accuracy after just its **first**
 epoch — roughly what the dense network needed 3-4 epochs to reach, and
 close to what it took the dense network 10+ epochs to *exceed*. By
-epoch 4 it had already passed the dense network's best-ever result
-(98.47%, achieved only with the help of 11x more training data via
-augmentation) using the *plain*, unaugmented 50,000-image training set:
+epoch 4 it had already passed the dense network's best-ever result with
+augmentation (98.47%, achieved only with the help of 11x more training
+data) using the *plain*, unaugmented 50,000-image training set:
 
 ```
 Epoch  1  eta=0.1    val_acc=97.67%
@@ -248,32 +248,77 @@ Epoch 25  eta=0.025  val_acc=98.94%
 ```
 
 Full hyperparameters and the complete per-epoch log are in
-[`benchmarks/benchmark_cnn.json`](benchmarks/benchmark_cnn.json).
+[`benchmarks/benchmark_cnn_no_augmentation.json`](benchmarks/benchmark_cnn_no_augmentation.json).
 <!-- CNN_BENCHMARK_END -->
 
-## Dense vs. CNN: the final comparison
+## Results — CNN + augmentation
 
-| | Dense, no augmentation | Dense, +rotation augmentation | **CNN**, no augmentation |
-|---|---|---|---|
-| Training examples | 50,000 | 550,000 | 50,000 |
-| Epochs run | 60 | 30 | 25 |
-| Training time | ~7.7 min | ~38.8 min | ~24 min |
-| **Final test accuracy** | 98.02% | 98.47% | **98.96%** |
+<!-- CNN_AUG_BENCHMARK_START -->
+The one combination the section above left untried: training the CNN
+on the same rotation-augmented, 550,000-image set that helped the dense
+network. It was the most promising remaining lever — the strongest
+architecture paired with the technique that had already helped the
+weaker one — and it worked:
 
-Switching architecture (plain → convolutional) bought roughly **twice
-the accuracy improvement** that 11x more training data did for the
-plain network — on *less* data and in *less* training time than the
-augmented dense run. This is exactly the pattern the "why would a CNN
+| Metric | Value |
+|---|---|
+| **Final test accuracy** | **99.20%** (9,920 / 10,000) |
+| Final validation accuracy | 99.13% |
+| Best validation accuracy (any epoch) | 99.16% (epoch 15) |
+| Training examples | 550,000 (50,000 original + 500,000 rotated copies) |
+| Epochs run | 25 (hit the epoch cap) |
+| Learning rate schedule | 0.1 → 0.05 (epoch 14) → 0.025 (epoch 21) |
+| Total training time | ~3.9 hours, on a laptop CPU, no GPU |
+
+Unlike every run before it, validation accuracy was already past 99%
+by epoch 4 and never dropped back below it — the combination is both
+more accurate and more stable than either technique alone:
+
+```
+Epoch  1  eta=0.1    val_acc=98.78%
+Epoch  4  eta=0.1    val_acc=99.06%   (first epoch over 99%)
+Epoch 15  eta=0.05   val_acc=99.16%   (best epoch)
+Epoch 25  eta=0.025  val_acc=99.13%
+```
+
+**A note on that training time.** The logged total was actually 4.9
+hours; one epoch (23) took 70 minutes instead of its usual 9, because
+the laptop went to sleep mid-epoch and the process simply resumed when
+it woke — no lost work, no effect on the result, just inflated
+wall-clock time for that one epoch. ~3.9 hours is that run with the
+sleep gap subtracted back out, which matches the other 24 epochs'
+pace. If you're running this yourself, keep the machine from sleeping.
+
+Full hyperparameters and the complete per-epoch log are in
+[`benchmarks/benchmark_cnn.json`](benchmarks/benchmark_cnn.json).
+<!-- CNN_AUG_BENCHMARK_END -->
+
+## The full comparison
+
+| | Dense | Dense + augmentation | CNN | **CNN + augmentation** |
+|---|---|---|---|---|
+| Training examples | 50,000 | 550,000 | 50,000 | 550,000 |
+| Epochs run | 60 | 30 | 25 | 25 |
+| Training time | ~7.7 min | ~38.8 min | ~24 min | ~3.9 hr |
+| **Final test accuracy** | 98.02% | 98.47% | 98.96% | **99.20%** |
+
+Two independent levers, both real: switching architecture (dense → CNN)
+bought roughly twice the accuracy improvement that 11x more training
+data bought the dense network, and the two combine rather than
+duplicate each other — augmentation added another +0.24 points on top
+of the CNN's own +0.94-point architectural gain, the biggest single
+jump of the four runs. This matches the pattern the "why would a CNN
 help?" discussion earlier in this README predicts: a fully-connected
-network's ceiling on MNIST is architectural, not a data problem, so no
-amount of extra (even augmented) data closes the gap to a network that
-actually understands which pixels are neighbors. Combining both
-techniques — training the CNN on the augmented 550,000-image set too —
-would likely push accuracy a bit further still; it wasn't run here
-purely due to time (a CNN epoch is already ~15-20x slower than a dense
-epoch, and 550,000 augmented examples would push a full run to several
-hours), but `AUGMENT_WITH_ROTATIONS = True` with `ARCHITECTURE = "cnn"`
-in `scripts/train.py` is all it takes to try.
+network's ceiling on MNIST is architectural, not a data problem, so a
+CNN had more room left for augmentation to help than the dense network
+did — it wasn't anywhere near its own ceiling yet.
+
+The cost is real too: a CNN epoch is roughly 7-8x slower than a dense
+epoch (measured both ways — with and without augmentation, consistently),
+and the augmented set is 11x bigger, so this run took about 30x longer
+than the original dense baseline for a 1.18-point accuracy gain. Whether
+that trade is worth it depends entirely on what the accuracy is for —
+for this project, recording the result was the point.
 
 ## Running it yourself
 
@@ -310,12 +355,15 @@ both architectures at this scale):
 | Dense, no augmentation | under 10 minutes |
 | Dense, with rotation augmentation (550,000 examples) | ~35-40 minutes |
 | CNN, no augmentation | ~20-25 minutes |
+| CNN, with rotation augmentation (550,000 examples) | ~4 hours |
 
-Data augmentation (`AUGMENT_WITH_ROTATIONS` at the top of
-`scripts/train.py`) defaults to on for the dense network and off for
-the CNN, since a CNN epoch is already considerably more expensive than
-a dense epoch — flip it on for the CNN if you have the extra time to
-spare.
+`AUGMENT_WITH_ROTATIONS` at the top of `scripts/train.py` defaults to
+on — it's what produced every result in this README, including the
+best one. Flip it off if you want a faster run and can live with a
+lower-accuracy result; the CNN-with-augmentation combination in
+particular is a multi-hour commitment on a laptop CPU, so make sure
+the machine won't sleep partway through (see the note under "Results —
+CNN + augmentation" above for what happens if it does).
 
 ### Using a trained network afterwards
 
@@ -328,7 +376,7 @@ from network import Network
 net = Network.load("model/trained_network.json")
 prediction = net.feedforward(some_28x28_image_as_a_784x1_column)
 
-# ...or the CNN:
+# ...or the CNN (this repo's best result, trained with augmentation):
 from conv_network import ConvNetwork
 net = ConvNetwork.load("model/trained_cnn.json")
 logits = net.forward(some_batch_of_images_shaped_Nx1x28x28)
@@ -350,11 +398,13 @@ mnist-neural-network/
 │   ├── download_mnist.py   # fetches the raw dataset
 │   └── train.py            # trains either architecture end-to-end (see ARCHITECTURE flag)
 ├── model/
-│   ├── trained_network.json  # the dense network's trained weights
-│   └── trained_cnn.json      # the CNN's trained weights
+│   ├── trained_network.json          # dense network's trained weights
+│   ├── trained_cnn.json              # CNN's trained weights, WITH augmentation (99.20%, the best in this repo)
+│   └── trained_cnn_no_augmentation.json  # CNN's trained weights, without augmentation (98.96%, kept for comparison)
 ├── benchmarks/
-│   ├── benchmark.json        # dense network: hyperparameters + per-epoch results
-│   └── benchmark_cnn.json    # CNN: hyperparameters + per-epoch results
+│   ├── benchmark.json                    # dense network: hyperparameters + per-epoch results
+│   ├── benchmark_cnn.json                # CNN + augmentation: hyperparameters + per-epoch results
+│   └── benchmark_cnn_no_augmentation.json  # CNN alone: hyperparameters + per-epoch results
 └── data/                   # (gitignored) raw MNIST file lives here
 ```
 
