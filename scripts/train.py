@@ -65,12 +65,17 @@ DENSE_LMBDA = 5.0                             # L2 regularization strength
 # is the standard pairing for a CNN (as opposed to the dense network's
 # sigmoid + cross-entropy), so this network needs its own, smaller
 # learning rate -- 0.5 would overshoot badly with ReLU/softmax.
-CNN_NUM_FILTERS = 20
-CNN_FILTER_SIZE = 5
+#
+# CNN_CONV_BLOCKS is a tuple of (out_channels, filter_size) pairs, one
+# per "scan, then zoom out" stage -- see ConvNetwork's docstring. This
+# value was chosen by screening several architectures on the fast,
+# unaugmented data first; see scripts/screen_architectures.py and
+# docs/architecture_screening.md for that comparison.
+CNN_CONV_BLOCKS = ((20, 5), (40, 5))
 CNN_HIDDEN_UNITS = 100
-CNN_EPOCHS = 25
+CNN_EPOCHS = 15
 CNN_MINI_BATCH_SIZE = 50
-CNN_ETA = 0.1
+CNN_ETA = 0.2
 CNN_LMBDA = 0.1
 
 # --- Shared training-loop settings (both architectures) ---
@@ -208,14 +213,18 @@ def train_dense(training_data, validation_data, test_data, original_training_siz
     print(f"Saved benchmark report to {benchmark_path}")
 
 
+def _describe_conv_blocks(conv_blocks):
+    stages = " -> ".join(f"Conv2D({c} filters, {f}x{f})->ReLU->Pool" for c, f in conv_blocks)
+    return stages
+
+
 def train_cnn(training_data, validation_data, test_data, original_training_size):
     print(
-        f"\nBuilding CNN: Conv2D({CNN_NUM_FILTERS} filters, {CNN_FILTER_SIZE}x{CNN_FILTER_SIZE}) "
-        f"-> ReLU -> MaxPool2D(2x2) -> Dense({CNN_HIDDEN_UNITS}) -> ReLU -> Dense(10) -> softmax..."
+        f"\nBuilding CNN: {_describe_conv_blocks(CNN_CONV_BLOCKS)} "
+        f"-> Dense({CNN_HIDDEN_UNITS}) -> ReLU -> Dense(10) -> softmax..."
     )
     net = ConvNetwork(
-        num_filters=CNN_NUM_FILTERS,
-        filter_size=CNN_FILTER_SIZE,
+        conv_blocks=CNN_CONV_BLOCKS,
         hidden_units=CNN_HIDDEN_UNITS,
     )
 
@@ -258,8 +267,7 @@ def train_cnn(training_data, validation_data, test_data, original_training_size)
     benchmark = {
         "hyperparameters": {
             "architecture": "cnn",
-            "num_filters": CNN_NUM_FILTERS,
-            "filter_size": CNN_FILTER_SIZE,
+            "conv_blocks": list(CNN_CONV_BLOCKS),
             "hidden_units": CNN_HIDDEN_UNITS,
             "epochs_run": len(log["eta"]),
             "epochs_configured": CNN_EPOCHS,

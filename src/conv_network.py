@@ -38,7 +38,12 @@ This network's architecture
 One round of "scan for patterns with 20 flashlights, then zoom out",
 followed by the same kind of fully-connected "voting" layer the plain
 network uses -- just handed a much more useful starting point (20
-pattern maps) instead of raw pixels.
+pattern maps) instead of raw pixels. That's the default, one-block
+shape -- ``ConvNetwork`` can build more than one "scan, then zoom out"
+stage in a row (see ``conv_blocks`` below), each stage handed the
+previous one's pattern maps instead of raw pixels, so later filters can
+learn to recognise combinations of the earlier ones (a curve and a
+loop together, say, rather than just a curve).
 """
 
 import json
@@ -81,37 +86,49 @@ class ConvNetwork:
 
     Parameters
     ----------
-    num_filters : int
-        How many convolutional filters the first (and only) conv layer
-        learns.
-    filter_size : int
-        The width/height of each filter, in pixels.
+    conv_blocks : tuple of (out_channels, filter_size) pairs
+        One entry per "scan, then zoom out" stage -- a ``Conv2D`` with
+        that many filters of that size, followed by ``ReLU`` and a 2x2
+        ``MaxPool2D``. The default, ``((20, 5),)``, is this project's
+        original single-stage network. Passing more than one entry
+        stacks stages, each one handed the previous stage's pattern
+        maps as its input instead of raw pixels -- e.g.
+        ``((20, 5), (40, 5))`` is a 20-filter stage feeding a 40-filter
+        stage, the classic "deeper CNN" shape.
     hidden_units : int
         How many neurons the fully-connected hidden layer has, after the
         convolution and pooling stages.
     """
 
-    def __init__(self, num_filters=20, filter_size=5, hidden_units=100):
-        self.num_filters = num_filters
-        self.filter_size = filter_size
+    def __init__(self, conv_blocks=((20, 5),), hidden_units=100):
+        self.conv_blocks = tuple(conv_blocks)
         self.hidden_units = hidden_units
-
-        pooled_size = (28 - filter_size + 1) // 2  # after conv (valid) + 2x2 pool
-        flattened_size = num_filters * pooled_size * pooled_size
 
         # The network is just a plain Python list of layers, each one
         # responsible for its own forward/backward math (see
         # conv_layers.py). Running the whole network forward or backward
         # is simply looping over this list, forwards or in reverse.
-        self.layers = [
-            Conv2D(in_channels=1, out_channels=num_filters, filter_size=filter_size),
-            ReLU(),
-            MaxPool2D(pool_size=2),
-            Flatten(),
-            Dense(in_features=flattened_size, out_features=hidden_units),
-            ReLU(),
-            Dense(in_features=hidden_units, out_features=10),
-        ]
+        self.layers = []
+        in_channels = 1
+        spatial_size = 28
+        for out_channels, filter_size in self.conv_blocks:
+            self.layers.append(
+                Conv2D(in_channels=in_channels, out_channels=out_channels, filter_size=filter_size)
+            )
+            self.layers.append(ReLU())
+            self.layers.append(MaxPool2D(pool_size=2))
+            # Valid convolution shrinks each side by (filter_size - 1);
+            # the 2x2 pool then halves what's left. Tracking this as we
+            # go is what lets any number of stages, with any filter
+            # sizes, find their way to the right Dense input size below.
+            spatial_size = (spatial_size - filter_size + 1) // 2
+            in_channels = out_channels
+
+        flattened_size = in_channels * spatial_size * spatial_size
+        self.layers.append(Flatten())
+        self.layers.append(Dense(in_features=flattened_size, out_features=hidden_units))
+        self.layers.append(ReLU())
+        self.layers.append(Dense(in_features=hidden_units, out_features=10))
 
     def forward(self, x_batch):
         """
@@ -296,11 +313,17 @@ class ConvNetwork:
         file, in the same spirit as ``Network.save`` -- this is what the
         TypeScript web app loads to run this exact trained network in
         the browser.
+
+        The web app's forward pass (``lib/convNetwork.ts``) doesn't read
+        ``conv_blocks`` or ``hidden_units`` at all -- it infers every
+        layer's shape directly from its saved weight array, walking
+        ``layers`` by ``type`` alone. Those two fields exist purely so
+        ``load`` below can rebuild an identical ``ConvNetwork`` in
+        Python, for any number of conv stages.
         """
         data = {
             "architecture": "cnn",
-            "num_filters": self.num_filters,
-            "filter_size": self.filter_size,
+            "conv_blocks": [list(block) for block in self.conv_blocks],
             "hidden_units": self.hidden_units,
             "layers": [],
         }
@@ -320,8 +343,7 @@ class ConvNetwork:
         with open(json_path, "r") as f:
             data = json.load(f)
         net = ConvNetwork(
-            num_filters=data["num_filters"],
-            filter_size=data["filter_size"],
+            conv_blocks=tuple(tuple(block) for block in data["conv_blocks"]),
             hidden_units=data["hidden_units"],
         )
         param_layers = [layer for layer in net.layers if layer.has_params]

@@ -1,0 +1,177 @@
+{
+  "screen_epochs": 8,
+  "candidates": {
+    "baseline (current production config)": {
+      "conv_blocks": [
+        [
+          20,
+          5
+        ]
+      ],
+      "hidden_units": 100,
+      "eta": 0.1,
+      "lmbda": 0.1,
+      "epochs_run": 8,
+      "seconds_per_epoch": 54.4,
+      "total_seconds": 435.3,
+      "final_val_accuracy_pct": 98.8,
+      "best_val_accuracy_pct": 98.8,
+      "evaluation_accuracy": [
+        9714,
+        9822,
+        9848,
+        9848,
+        9837,
+        9878,
+        9873,
+        9880
+      ]
+    },
+    "wider (40 filters, still 1 conv layer)": {
+      "conv_blocks": [
+        [
+          40,
+          5
+        ]
+      ],
+      "hidden_units": 100,
+      "eta": 0.1,
+      "lmbda": 0.1,
+      "epochs_run": 8,
+      "seconds_per_epoch": 108.7,
+      "total_seconds": 869.6,
+      "final_val_accuracy_pct": 98.85,
+      "best_val_accuracy_pct": 98.85,
+      "evaluation_accuracy": [
+        9753,
+        9824,
+        9864,
+        9830,
+        9869,
+        9869,
+        9859,
+        9885
+      ]
+    },
+    "deeper (2 conv layers, 20->40)": {
+      "conv_blocks": [
+        [
+          20,
+          5
+        ],
+        [
+          40,
+          5
+        ]
+      ],
+      "hidden_units": 100,
+      "eta": 0.1,
+      "lmbda": 0.1,
+      "epochs_run": 8,
+      "seconds_per_epoch": 173.5,
+      "total_seconds": 1388.2,
+      "final_val_accuracy_pct": 99.01,
+      "best_val_accuracy_pct": 99.01,
+      "evaluation_accuracy": [
+        9757,
+        9852,
+        9850,
+        9888,
+        9883,
+        9892,
+        9885,
+        9901
+      ]
+    },
+    "deeper + wider (2 conv layers, 32->64, bigger hidden)": {
+      "conv_blocks": [
+        [
+          32,
+          5
+        ],
+        [
+          64,
+          5
+        ]
+      ],
+      "hidden_units": 128,
+      "eta": 0.1,
+      "lmbda": 0.1,
+      "epochs_run": 8,
+      "seconds_per_epoch": 385.5,
+      "total_seconds": 3083.7,
+      "final_val_accuracy_pct": 99.02,
+      "best_val_accuracy_pct": 99.03,
+      "evaluation_accuracy": [
+        9741,
+        9857,
+        9887,
+        9875,
+        9899,
+        9899,
+        9903,
+        9902
+      ]
+    },
+    "deeper, higher eta": {
+      "conv_blocks": [
+        [
+          20,
+          5
+        ],
+        [
+          40,
+          5
+        ]
+      ],
+      "hidden_units": 100,
+      "eta": 0.2,
+      "lmbda": 0.1,
+      "epochs_run": 8,
+      "seconds_per_epoch": 177.8,
+      "total_seconds": 1422.6,
+      "final_val_accuracy_pct": 98.58,
+      "best_val_accuracy_pct": 99.03,
+      "evaluation_accuracy": [
+        9832,
+        9838,
+        9822,
+        9886,
+        9903,
+        9894,
+        9897,
+        9858
+      ]
+    },
+    "deeper, lighter regularization": {
+      "conv_blocks": [
+        [
+          20,
+          5
+        ],
+        [
+          40,
+          5
+        ]
+      ],
+      "hidden_units": 100,
+      "eta": 0.1,
+      "lmbda": 0.02,
+      "epochs_run": 8,
+      "seconds_per_epoch": 165.7,
+      "total_seconds": 1325.8,
+      "final_val_accuracy_pct": 98.89,
+      "best_val_accuracy_pct": 98.94,
+      "evaluation_accuracy": [
+        9809,
+        9847,
+        9865,
+        9875,
+        9890,
+        9889,
+        9894,
+        9889
+      ]
+    }
+  }
+}

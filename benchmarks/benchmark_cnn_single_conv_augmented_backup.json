@@ -1,0 +1,91 @@
+{
+  "hyperparameters": {
+    "architecture": "cnn",
+    "num_filters": 20,
+    "filter_size": 5,
+    "hidden_units": 100,
+    "epochs_run": 25,
+    "epochs_configured": 25,
+    "mini_batch_size": 50,
+    "initial_eta": 0.1,
+    "final_eta": 0.025,
+    "lmbda": 0.1,
+    "cost": "softmax cross-entropy",
+    "activation": "ReLU (hidden layers), softmax (output)"
+  },
+  "dataset": {
+    "original_training_examples": 50000,
+    "training_examples": 550000,
+    "validation_examples": 10000,
+    "test_examples": 10000,
+    "augmentation": {
+      "technique": "rotation",
+      "max_angle_degrees": 15.0,
+      "copies_per_image": 10
+    }
+  },
+  "results": {
+    "final_validation_accuracy_pct": 99.13,
+    "final_test_accuracy_pct": 99.2,
+    "test_correct": 9920,
+    "test_total": 10000,
+    "total_training_time_seconds": 17716.54581308365
+  },
+  "per_epoch_log": {
+    "evaluation_accuracy": [
+      9878,
+      9899,
+      9899,
+      9906,
+      9913,
+      9899,
+      9912,
+      9915,
+      9912,
+      9907,
+      9915,
+      9913,
+      9912,
+      9915,
+      9916,
+      9914,
+      9913,
+      9912,
+      9913,
+      9914,
+      9914,
+      9914,
+      9914,
+      9914,
+      9913
+    ],
+    "training_accuracy": [],
+    "eta": [
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.1,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.05,
+      0.025,
+      0.025,
+      0.025,
+      0.025,
+      0.025
+    ]
+  }
+}
